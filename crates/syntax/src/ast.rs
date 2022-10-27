@@ -480,6 +480,13 @@ ast_node!(ParenExpr:
     right_paren_token: Option<SyntaxToken ParenRight>;
     inner: Option<Expr>;
 );
+ast_node!(BitcastExpr:
+    bitcast_token: Option<SyntaxToken Bitcast>;
+    l_angle_token: Option<SyntaxToken LessThan>;
+    r_angle_token: Option<SyntaxToken GreaterThan>;
+    ty: Option<Type>;
+    inner: Option<ParenExpr>;
+);
 ast_node!(FieldExpr:
     expr: Option<Expr>;
     name_ref: Option<NameRef>;
@@ -742,6 +749,7 @@ ast_enum! {
         FunctionCall,
         IndexExpr,
         PathExpr,
+        BitcastExpr,
     }
 }
 
