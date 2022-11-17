@@ -26,7 +26,7 @@ const ITEM_RECOVERY_SET: &[SyntaxKind] =
 
 fn item(p: &mut Parser) {
     let m = p.start();
-    attribute_list_opt(p);
+    attribute_list_opt(p, AttributeImports::Supported);
     if p.at(SyntaxKind::UnofficialPreprocessorImport) {
         import(p, m);
     } else if p.at(SyntaxKind::Fn) {
@@ -148,7 +148,9 @@ fn struct_(p: &mut Parser, m: Marker) {
 
 fn struct_member(p: &mut Parser) {
     let m = p.start();
-    attribute_list_opt(p);
+    // If you need attribute imports on a struct, for now you should just
+    // import the entire struct
+    attribute_list_opt(p, AttributeImports::Unsupported);
     variable_ident_decl(p);
 
     if p.at(SyntaxKind::Semicolon) || p.at(SyntaxKind::Comma) {
@@ -178,7 +180,7 @@ fn function(p: &mut Parser, m: Marker) {
         let m = p.start();
         p.bump();
 
-        attribute_list_opt(p);
+        attribute_list_opt(p, AttributeImports::Unsupported);
 
         if p.at(SyntaxKind::BraceLeft) {
             p.error_no_bump(&[SyntaxKind::Type]);
@@ -288,7 +290,7 @@ fn param(p: &mut Parser) {
         return;
     }
 
-    attribute_list_opt(p);
+    attribute_list_opt(p, AttributeImports::Unsupported);
     if p.at(SyntaxKind::ParenRight) {
         p.set_expected(vec![SyntaxKind::VariableIdentDecl]);
         p.error_recovery(&[SyntaxKind::ParenRight]);
@@ -311,7 +313,7 @@ fn variable_ident_decl(p: &mut Parser) {
 
     p.expect(SyntaxKind::Colon);
 
-    attribute_list_opt(p);
+    attribute_list_opt(p, AttributeImports::Unsupported);
 
     if p.at_set(&[SyntaxKind::ParenRight, SyntaxKind::BraceRight]) {
         p.error_no_bump(&[SyntaxKind::Type]);
@@ -833,24 +835,30 @@ fn access_mode(p: &mut Parser) {
     if_at_set_or(p, ACCESS_MODE_SET, SyntaxKind::Ident);
 }
 
-pub fn attribute_list_opt(p: &mut Parser) {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AttributeImports {
+    Supported,
+    Unsupported,
+}
+
+pub fn attribute_list_opt(p: &mut Parser, imports: AttributeImports) {
     if p.at(SyntaxKind::Attr) || p.at(SyntaxKind::AttrLeft) {
-        attribute_list(p);
+        attribute_list(p, imports);
     }
 }
-pub fn attribute_list(p: &mut Parser) {
+pub fn attribute_list(p: &mut Parser, imports: AttributeImports) {
     if p.at(SyntaxKind::Attr) {
-        attribute_list_modern(p);
+        attribute_list_modern(p, imports);
     } else if p.at(SyntaxKind::AttrLeft) {
         attribute_list_legacy(p);
     }
 }
 
-fn attribute_list_modern(p: &mut Parser) {
+fn attribute_list_modern(p: &mut Parser, imports: AttributeImports) {
     let m = p.start();
     while p.at(SyntaxKind::Attr) {
         p.bump();
-        attribute(p);
+        attribute(p, imports);
     }
     m.complete(p, SyntaxKind::AttributeList);
 }
@@ -862,12 +870,19 @@ fn attribute_list_legacy(p: &mut Parser) {
         SyntaxKind::AttrRight,
         SyntaxKind::Comma,
         SyntaxKind::AttributeList,
-        attribute,
+        |p| attribute(p, AttributeImports::Unsupported),
     );
 }
 
-fn attribute(p: &mut Parser) {
+fn attribute(p: &mut Parser, imports: AttributeImports) {
     let m = p.start();
+    if p.at(SyntaxKind::UnofficialPreprocessorImport) {
+        if !matches!(imports, AttributeImports::Supported) {
+            p.error_no_bump(&[SyntaxKind::Ident]);
+        }
+        import(p, m);
+        return;
+    }
     if p.at(SyntaxKind::Ident) {
         p.bump();
     } else {

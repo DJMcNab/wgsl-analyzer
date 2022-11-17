@@ -57,9 +57,10 @@ pub fn parse_entrypoint(input: &str, entrypoint: ParseEntryPoint) -> Parse {
         ParseEntryPoint::Type => parser::parse::<ParserDefinition, _>(input, |p| {
             grammar::type_decl(p);
         }),
-        ParseEntryPoint::AttributeList => {
-            parser::parse::<ParserDefinition, _>(input, grammar::attribute_list)
-        }
+        ParseEntryPoint::AttributeList => parser::parse::<ParserDefinition, _>(input, |p| {
+            // Don't allow nested imports of attributes
+            grammar::attribute_list(p, grammar::AttributeImports::Unsupported)
+        }),
         ParseEntryPoint::FnParamList => {
             parser::parse::<ParserDefinition, _>(input, grammar::inner_param_list)
         }
