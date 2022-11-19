@@ -14,11 +14,18 @@ use super::{BindingId, Body};
 
 pub type ScopeId = Idx<ScopeData>;
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct ScopeRange {
+    pub scope: ScopeId,
+    /// This `ExprScope` covers `scope[..segment]`
+    pub segment: u32,
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct ExprScopes {
     scopes: Arena<ScopeData>,
-    pub scope_by_expr: FxHashMap<ExprId, ScopeId>,
-    scope_by_stmt: FxHashMap<StatementId, ScopeId>,
+    pub scope_by_expr: FxHashMap<ExprId, ScopeRange>,
+    scope_by_stmt: FxHashMap<StatementId, ScopeRange>,
 }
 
 #[derive(Debug, PartialEq, Eq, Default)]
@@ -67,10 +74,10 @@ impl ExprScopes {
         scopes
     }
 
-    pub fn scope_for_expr(&self, expr: ExprId) -> Option<ScopeId> {
+    pub fn scope_for_expr(&self, expr: ExprId) -> Option<ScopeRange> {
         self.scope_by_expr.get(&expr).copied()
     }
-    pub fn scope_for_statement(&self, stmt: StatementId) -> Option<ScopeId> {
+    pub fn scope_for_statement(&self, stmt: StatementId) -> Option<ScopeRange> {
         self.scope_by_stmt.get(&stmt).copied()
     }
 
@@ -92,10 +99,21 @@ impl ExprScopes {
     }
 
     fn set_scope_expr(&mut self, expr: ExprId, scope: ScopeId) {
-        self.scope_by_expr.insert(expr, scope);
+        self.scope_by_expr.insert(expr, self.scope_progress(scope));
+    }
+
+    fn scope_progress(&self, scope: Idx<ScopeData>) -> ScopeRange {
+        ScopeRange {
+            scope,
+            segment: self.scopes[scope]
+                .entries
+                .len()
+                .try_into()
+                .expect("Should have more than u32::MAX expressions"),
+        }
     }
     fn set_scope_stmt(&mut self, stmt: StatementId, scope: ScopeId) {
-        self.scope_by_stmt.insert(stmt, scope);
+        self.scope_by_stmt.insert(stmt, self.scope_progress(scope));
     }
 
     fn add_param_bindings(&mut self, body: &Body, root: Idx<ScopeData>, params: &[BindingId]) {

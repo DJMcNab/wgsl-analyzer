@@ -32,6 +32,7 @@ pub struct ExprScope {
     owner: FunctionId,
     expr_scopes: Arc<ExprScopes>,
     scope_id: ScopeId,
+    initial_segment: u32,
 }
 
 #[derive(Debug)]
@@ -92,12 +93,13 @@ impl Resolver {
         mut self,
         owner: FunctionId,
         expr_scopes: Arc<ExprScopes>,
-        scope_id: ScopeId,
+        scope: crate::body::scope::ScopeRange,
     ) -> Resolver {
         self.scopes.push(Scope::ExprScope(ExprScope {
             owner,
             expr_scopes,
-            scope_id,
+            scope_id: scope.scope,
+            initial_segment: scope.segment,
         }));
         self
     }
